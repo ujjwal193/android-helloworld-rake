@@ -20,6 +20,8 @@ src = 'src'
 gen = 'gen'
 res = 'res'
 bin = 'bin'
+libs = 'libs'
+assets = 'assets'
 classes = "#{bin}/classes"
 ap_ = "#{bin}/#{project}.ap_"
 apk = "#{bin}/#{project}.apk"
@@ -34,7 +36,7 @@ directory classes
 dirs = [gen, bin, classes]
 
 CLEAN.include(gen, bin)
-CLASSPATH = FileList.new
+CLASSPATH = FileList["#{libs}/**/*.jar"]
 BOOTCLASSPATH = FileList[android_jar]
 
 # Extensions for standard rake classes.
@@ -53,13 +55,6 @@ def compile(dest, *srcdirs)
   end
 
   sh("javac", "-target", "1.5", "-g", "-bootclasspath", BOOTCLASSPATH.to_cp,  "-nowarn", "-Xlint:none", "-sourcepath", srcdirs.join(File::PATH_SEPARATOR), "-d", dest ,"-classpath", CLASSPATH.to_cp, *files)
-
-#  resources = (FileList["#{srcdirs.first}/**/*"] - files).select {|f| File.file?(f) }
-#  resources.each do |f|
-#    target = f.pathmap("%{^#{Regexp.quote(dir)},#{dest}}p")
-#    mkdir_p File.dirname(target), :verbose=>false
-#    cp f, target, :verbose=>false
-#  end
 end
 
 task :default => :debug
@@ -80,13 +75,12 @@ task :compile => [:resource_src, :aidl] do
 end
 
 task :dex => :compile do
-  sh "dx --dex --output=#{intermediate_dex_location} #{classes}"
-  #TODO: need to dx ext libs
+  sh "dx", *["--dex", "--output=#{intermediate_dex_location}", classes ] + CLASSPATH
 end
 
 task :package_resources do
-  opts = ["package", "-M", "AndroidManifest.xml", "-I", android_jar, "-S", res, "-F", ap_]
-  #["-A", assets]
+  opts = ["package", "-f", "-M", "AndroidManifest.xml", "-I", android_jar, "-S", res, "-F", ap_]
+  opts += ["-A", assets] if File.directory?(assets)
   sh "aapt", *opts
 end
 
@@ -94,6 +88,8 @@ end
 desc "Builds the application and sign it with a debug key."
 task :debug => [:dex, :package_resources] do
   args = [apk, "-f", intermediate_dex_location, "-rf", src, "-z", ap_]
+  args += [ "-rj", libs] if File.directory?(libs)
+
   sh "apkbuilder", *args
 end
 
