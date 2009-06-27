@@ -1,7 +1,20 @@
+require 'rubygems'
+require 'rake'
+require 'rexml/document'
 require 'rake/clean'
 
-project = 'hello_world'
-app_pkg = 'com.example.myproject'
+def manifest
+  @parsed ||= begin
+    doc = REXML::Document.new(File.read('AndroidManifest.xml'))
+    {
+      :package => doc.root.attribute('package').to_s
+    }
+  end
+end
+
+app_pkg = manifest[:package]
+project = app_pkg.gsub(/\./, '_')
+
 sdk_location = ENV['ANDROID_SDK'] || '/Users/jan/projects/android-sdk-mac_x86-1.5_r1'
 src = 'src'
 gen = 'gen'
@@ -98,3 +111,6 @@ desc "uninstall the application from a running emulator or device."
 task :uninstall do
   sh "adb uninstall #{app_pkg}"
 end
+
+
+
