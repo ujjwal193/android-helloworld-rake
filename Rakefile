@@ -54,7 +54,8 @@ def compile(dest, *srcdirs)
     files.include("#{d}/**/*.java")
   end
 
-  sh("javac", "-target", "1.5", "-g", "-bootclasspath", BOOTCLASSPATH.to_cp,  "-nowarn", "-Xlint:none", "-sourcepath", srcdirs.join(File::PATH_SEPARATOR), "-d", dest ,"-classpath", CLASSPATH.to_cp, *files)
+  sh "javac", "-target", "1.5", "-g", "-bootclasspath", BOOTCLASSPATH.to_cp,  "-nowarn", "-Xlint:none", 
+     "-sourcepath", srcdirs.join(File::PATH_SEPARATOR), "-d", dest ,"-classpath", CLASSPATH.to_cp, *files
 end
 
 task :default => :debug
@@ -84,35 +85,57 @@ task :package_resources do
   sh "aapt", *opts
 end
 
-
-desc "Builds the application and sign it with a debug key."
-task :debug => [:dex, :package_resources] do
+apkbuilder = Proc.new do |signed| 
   args = [apk, "-f", intermediate_dex_location, "-rf", src, "-z", ap_]
   args += [ "-rj", libs] if File.directory?(libs)
+  args += ["-u" ] unless signed
 
   sh "apkbuilder", *args
 end
 
-
-def adb(*args)
-    args.unshift '-s', ENV['DEVICE'] if ENV['DEVICE']
-    sh "adb", *args 
+desc "Builds the application and sign it with a debug key."
+task :debug => [:dex, :package_resources] do
+  apkbuilder.call(true)
 end
 
-desc "Installs the debug package onto a running emulator or device. This can only be used if the application has not yet been installed (DEVICE=<serialno>)"
+desc "Builds the application and sign it with a release key."
+task :release => [:dex, :package_resources] do
+  apkbuilder.call(false)
+  Rake::Task['package:sign'].invoke
+end
+
+def adb(*args)
+  args.unshift '-s', ENV['DEVICE'] if ENV['DEVICE']
+  sh "adb", *args 
+end
+
+desc "Installs the debug package onto a running emulator or device (DEVICE=<serialno>)."
 task :install => :debug do
   adb 'install', apk
 end
 
-desc "Installs the debug package on a running emulator or device that already has the application (DEVICE=<serialno>)"
+desc "Installs the debug package on a running emulator or device that already has the application (DEVICE=<serialno>)."
 task :reinstall => :debug do
   adb 'install', '-r', apk
 end
 
-desc "uninstall the application from a running emulator or device (DEVICE=<serialno>)"
+desc "uninstall the application from a running emulator or device (DEVICE=<serialno>)."
 task :uninstall do
   adb 'uninstall',  app_pkg
 end
 
+namespace :package do
+  desc "verify signature of the package."
+  task :verify do
+     sh "jarsigner",  "-verify",  "-certs", "-verbose", apk
+  end
+
+  desc "sign the package."
+  task :sign do
+    alias_name = "alias"
+    keystore   = "keystore"
+    sh "jarsigner",  "-verbose",  "-keystore", keystore, apk, alias_name
+  end
+end
 
 
