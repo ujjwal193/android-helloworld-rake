@@ -93,19 +93,25 @@ task :debug => [:dex, :package_resources] do
   sh "apkbuilder", *args
 end
 
-desc "Installs the debug package onto a running emulator or device. This can only be used if the application has not yet been installed."
+
+def adb(*args)
+    args.unshift '-s', ENV['DEVICE'] if ENV['DEVICE']
+    sh "adb", *args 
+end
+
+desc "Installs the debug package onto a running emulator or device. This can only be used if the application has not yet been installed (DEVICE=<serialno>)"
 task :install => :debug do
-  sh "adb install #{apk}"
+  adb 'install', apk
 end
 
-desc "Installs the debug package on a running emulator or device that already has the application."
+desc "Installs the debug package on a running emulator or device that already has the application (DEVICE=<serialno>)"
 task :reinstall => :debug do
-  sh "adb install -r #{apk}"
+  adb 'install', '-r', apk
 end
 
-desc "uninstall the application from a running emulator or device."
+desc "uninstall the application from a running emulator or device (DEVICE=<serialno>)"
 task :uninstall do
-  sh "adb uninstall #{app_pkg}"
+  adb 'uninstall',  app_pkg
 end
 
 
